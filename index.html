@@ -50,9 +50,9 @@
     logDiv.style.pointerEvents = 'none';
     document.body.appendChild(logDiv);
 
-    const VOSK_WS_URL = 'wss://apibybritto-m-vqsm0m-060482-168-231-95-211.traefik.me';
-    const GEMMA_URL = 'https://apibybritto-v-jbcqp2-7379bf-168-231-95-211.traefik.me/api/generate';
-    const KOKORO_TTS_URL = 'https://apibybritto-b-mubg35-1e8c25-168-231-95-211.traefik.me/v1/audio/speech';
+    const VOSK_WS_URL = 'ws://apibybritto-m-vqsm0m-060482-168-231-95-211.traefik.me';
+    const GEMMA_URL = 'http://apibybritto-v-jbcqp2-7379bf-168-231-95-211.traefik.me/api/generate';
+    const KOKORO_TTS_URL = 'http://apibybritto-b-mubg35-1e8c25-168-231-95-211.traefik.me/v1/audio/speech';
     const SYSTEM_PROMPT = 'Você é um assistente virtual brasileiro amigável e útil. Responda de forma natural e concisa em português.';
 
     let currentAudio = null;

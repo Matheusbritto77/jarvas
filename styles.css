@@ -1,0 +1,324 @@
+/* 🎨 Estilos para Interface de Voz Simplificada */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #333;
+}
+
+.container {
+    max-width: 800px;
+    width: 100%;
+    padding: 20px;
+}
+
+/* 🎭 Rosto Animado */
+.face-container {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.face {
+    width: 200px;
+    height: 200px;
+    background: #ffd93d;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.eyes {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 20px;
+}
+
+.eye {
+    width: 20px;
+    height: 20px;
+    background: #333;
+    border-radius: 50%;
+    animation: blink 3s infinite;
+}
+
+@keyframes blink {
+    0%, 90%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(0.1); }
+}
+
+.mouth {
+    width: 60px;
+    height: 20px;
+    border: 3px solid #333;
+    border-top: none;
+    border-radius: 0 0 60px 60px;
+    transition: all 0.3s ease;
+}
+
+/* Estados do Rosto */
+.face.listening .mouth {
+    border-radius: 0 0 60px 60px;
+    height: 20px;
+}
+
+.face.processing .mouth {
+    border-radius: 50%;
+    height: 30px;
+    width: 30px;
+    animation: processing 1s infinite;
+}
+
+.face.speaking .mouth {
+    border-radius: 50%;
+    height: 40px;
+    width: 40px;
+    animation: speaking 0.5s infinite;
+}
+
+@keyframes processing {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+@keyframes speaking {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+}
+
+/* Status Indicator */
+.status-indicator {
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.status-indicator.listening {
+    background: #4CAF50;
+    color: white;
+}
+
+.status-indicator.processing {
+    background: #FF9800;
+    color: white;
+}
+
+.status-indicator.speaking {
+    background: #2196F3;
+    color: white;
+}
+
+/* 📊 Logs */
+.logs-container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    margin-bottom: 20px;
+}
+
+.logs-container h3 {
+    margin-bottom: 15px;
+    color: #333;
+    text-align: center;
+}
+
+.logs-content {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.log-entry {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.log-entry.info {
+    color: #2196F3;
+}
+
+.log-entry.warning {
+    color: #FF9800;
+}
+
+.log-entry.error {
+    color: #F44336;
+}
+
+.log-entry.success {
+    color: #4CAF50;
+}
+
+/* 🔧 Painel de Debug */
+.debug-panel {
+    position: fixed;
+    top: 20px;
+    right: -400px;
+    width: 380px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    transition: right 0.3s ease;
+    z-index: 1000;
+}
+
+.debug-panel.show {
+    right: 20px;
+}
+
+.debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.debug-header h3 {
+    color: #333;
+    margin: 0;
+}
+
+.debug-header button {
+    background: #F44336;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.debug-section {
+    margin-bottom: 20px;
+}
+
+.debug-section h4 {
+    color: #333;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.debug-section p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.debug-section button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    background: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.debug-section button:hover {
+    background: #1976D2;
+}
+
+.debug-section button:active {
+    transform: scale(0.98);
+}
+
+/* 📱 Responsividade */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .face {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .eyes {
+        gap: 30px;
+    }
+    
+    .eye {
+        width: 15px;
+        height: 15px;
+    }
+    
+    .mouth {
+        width: 45px;
+        height: 15px;
+    }
+    
+    .debug-panel {
+        width: 90%;
+        right: -90%;
+    }
+    
+    .debug-panel.show {
+        right: 5%;
+    }
+}
+
+/* 🎨 Animações Adicionais */
+.face:hover {
+    transform: scale(1.05);
+}
+
+.log-entry {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 🎯 Estados de Foco */
+.debug-section button:focus {
+    outline: 2px solid #2196F3;
+    outline-offset: 2px;
+}
+
+/* 🌟 Efeitos Visuais */
+.face::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    background: linear-gradient(45deg, #ffd93d, #ffed4e);
+    border-radius: 50%;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.face:hover::before {
+    opacity: 1;
+}

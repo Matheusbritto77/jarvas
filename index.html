@@ -1,0 +1,321 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Assistente de Voz - Português</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="container">
+    <div class="face-container">
+      <div class="face listening">
+        <div class="eyes">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+        </div>
+        <div class="mouth listening"></div>
+      </div>
+    </div>
+
+    <div id="debug-panel" class="debug-panel">
+      <div class="debug-header">
+        <h3>🔧 Painel de Debug</h3>
+        <button onclick="document.getElementById('debug-panel').style.display='none'">✕</button>
+      </div>
+      <div class="debug-content">
+        <div class="debug-section">
+          <h4>📊 Status Atual</h4>
+          <p><strong>Estado:</strong> <span id="current-state">idle</span></p>
+          <p><strong>Processando:</strong> <span id="processing-status">false</span></p>
+        </div>
+        <div class="debug-section">
+          <h4>🧪 Testes</h4>
+          <button onclick="startVoicePipeline()">🎤 Iniciar Pipeline</button>
+          <button onclick="clearLogs()">🧹 Limpar Logs</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const logDiv = document.createElement('div');
+    logDiv.id = 'logs-content';
+    logDiv.style.position = 'absolute';
+    logDiv.style.top = '0';
+    logDiv.style.left = '0';
+    logDiv.style.width = '100%';
+    logDiv.style.height = '100%';
+    logDiv.style.pointerEvents = 'none';
+    document.body.appendChild(logDiv);
+
+    const VOSK_WS_URL = 'ws://apibybritto-m-vqsm0m-060482-168-231-95-211.traefik.me';
+    const GEMMA_URL = 'http://apibybritto-v-jbcqp2-7379bf-168-231-95-211.traefik.me/api/generate';
+    const KOKORO_TTS_URL = 'http://apibybritto-b-mubg35-1e8c25-168-231-95-211.traefik.me/v1/audio/speech';
+    const SYSTEM_PROMPT = 'Você é um assistente virtual brasileiro amigável e útil. Responda de forma natural e concisa em português.';
+
+    let currentAudio = null;
+    let isTTSPlaying = false;
+    let audioContext, source, processor, ws, stream;
+    let vadTriggered = false;
+    let currentLogElement = null;
+
+    function updateDynamicLog(message, color = '#0f0') {
+      if (currentLogElement) {
+        currentLogElement.remove();
+      }
+      currentLogElement = document.createElement('div');
+      currentLogElement.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      currentLogElement.style.color = color;
+      currentLogElement.style.fontWeight = 'bold';
+      currentLogElement.style.backgroundColor = '#f0f0f0';
+      currentLogElement.style.padding = '3px 5px';
+      currentLogElement.style.margin = '2px 0';
+      currentLogElement.style.borderRadius = '3px';
+      currentLogElement.style.textAlign = 'center';
+      currentLogElement.style.position = 'absolute';
+      currentLogElement.style.top = '70%';
+      currentLogElement.style.left = '50%';
+      currentLogElement.style.transform = 'translate(-50%, -50%)';
+      currentLogElement.style.width = 'auto';
+      currentLogElement.style.minWidth = '200px';
+      currentLogElement.style.pointerEvents = 'none';
+      logDiv.appendChild(currentLogElement);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function log(msg, type = 'info') {
+      // Todos os logs são dinâmicos e temporários
+      updateDynamicLog(msg, getLogColor(msg, type));
+    }
+
+    function getLogColor(msg, type) {
+      if (type === 'error' || msg.includes('[Erro')) {
+        return '#f55'; // vermelho
+      } else if (msg.startsWith('[Vosk]')) {
+        return '#2196f3'; // azul
+      } else if (msg.startsWith('[Gemma]')) {
+        return '#9c27b0'; // roxo
+      } else if (msg.startsWith('[Kokoro]')) {
+        return '#ff9800'; // laranja
+      } else if (msg.startsWith('[Falando]')) {
+        return '#ffd600'; // amarelo
+      } else if (msg.startsWith('[Pipeline]')) {
+        return '#00bcd4'; // ciano
+      } else {
+        return '#0f0'; // verde padrão
+      }
+    }
+
+    function normalizeText(text) {
+      return text.replace(/[{}<>\u0000-\u001F]/g, '')
+                 .replace(/[^À-ÿ\w\s,.!?]/gi, '')
+                 .replace(/\s+/g, ' ')
+                 .trim();
+    }
+
+    async function processWithGemma(userText) {
+      const prompt = `${SYSTEM_PROMPT}\nUsuário: ${userText}\nAssistente:`;
+      try {
+        const res = await fetch(GEMMA_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gemma3:4b', prompt })
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let fullResponse = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          for (const line of chunk.trim().split(/\r?\n/)) {
+            try {
+              const json = JSON.parse(line);
+              if (json.response) fullResponse += json.response;
+            } catch {}
+          }
+        }
+
+        return normalizeText(fullResponse);
+      } catch (e) {
+        log('[Gemma] Erro: ' + (e.message || e), 'error');
+        return 'Desculpe, não consegui responder.';
+      }
+    }
+
+    async function synthesizeWithKokoro(text) {
+      const payload = {
+        input: text,
+        voice: 'pf_dora',
+        speed: 1.0,
+        pitch: 1.0,
+        volume: 1.0
+      };
+
+      const res = await fetch(KOKORO_TTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      return await res.blob();
+    }
+
+    async function startVoicePipeline() {
+      log('[Pipeline] Iniciando pipeline de voz...', 'info');
+      log('[Vosk] Solicitando permissão do microfone...', 'info');
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      log('[Vosk] Microfone liberado. Inicializando contexto de áudio...', 'info');
+      audioContext = new AudioContext({ sampleRate: 16000 });
+      source = audioContext.createMediaStreamSource(stream);
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      ws = new WebSocket(VOSK_WS_URL);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        log('[Vosk] WebSocket conectado. Enviando configuração...', 'info');
+        ws.send(JSON.stringify({ config: { sample_rate: 16000 } }));
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+        log('[Vosk] Pronto para receber áudio do microfone.', 'info');
+        updateDynamicLog('Escutando...', '#2196f3');
+      };
+
+      let silenceFrames = 0;
+      const SILENCE_THRESHOLD = 30;
+
+      processor.onaudioprocess = (event) => {
+        if (isTTSPlaying) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const int16 = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          int16[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
+        }
+        const energy = int16.reduce((sum, val) => sum + Math.abs(val), 0) / int16.length;
+        if (energy > 100) {
+          if (!vadTriggered) {
+            updateDynamicLog('Enviando para Vosk...', '#2196f3');
+          }
+          vadTriggered = true;
+          silenceFrames = 0;
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(int16.buffer);
+          }
+        } else {
+          if (vadTriggered) {
+            silenceFrames++;
+            if (silenceFrames > SILENCE_THRESHOLD) {
+              updateDynamicLog('Escutando...', '#2196f3');
+              vadTriggered = false;
+              silenceFrames = 0;
+            }
+          }
+          if (ws.readyState === WebSocket.OPEN && vadTriggered) {
+            ws.send(int16.buffer);
+          }
+        }
+      };
+
+      ws.onmessage = async (msg) => {
+        try {
+          const data = JSON.parse(msg.data);
+          if (data.text && data.text.length > 1 && !data.text.includes('<unk>') && !data.text.includes('<UNK>')) {
+            log('[Vosk] Texto reconhecido: ' + data.text, 'info');
+            await pipelineProcess(data.text);
+          } else {
+            updateDynamicLog('Escutando...', '#2196f3');
+          }
+        } catch (err) {
+          log('[Vosk WS] Erro: ' + err, 'error');
+          updateDynamicLog('Escutando...', '#2196f3');
+        }
+      };
+    }
+
+    async function pipelineProcess(userText) {
+      try {
+        isTTSPlaying = true;
+        updateDynamicLog('Enviando para Gemma...', '#9c27b0');
+        const resposta = await processWithGemma(userText);
+        updateDynamicLog('Resposta da Gemma: ' + resposta, '#9c27b0');
+        updateDynamicLog('Enviando para Kokoro...', '#ff9800');
+        const ttsBlob = await synthesizeWithKokoro(resposta);
+        updateDynamicLog('Falando...', '#ffd600');
+        await playTTSAsync(ttsBlob);
+        updateDynamicLog('Escutando...', '#2196f3');
+      } catch (err) {
+        log('[Pipeline] Erro no fluxo: ' + err, 'error');
+        updateDynamicLog('Escutando...', '#2196f3');
+      } finally {
+        isTTSPlaying = false;
+      }
+    }
+
+    function playTTS(blob) {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = '';
+        currentAudio = null;
+      }
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      isTTSPlaying = true;
+      audio.oncanplaythrough = () => {
+        audio.play().catch(err => log('[TTS Playback] Erro: ' + err, 'error'));
+      };
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (currentAudio === audio) currentAudio = null;
+        isTTSPlaying = false;
+      };
+    }
+
+    function playTTSAsync(blob) {
+      return new Promise((resolve) => {
+            if (currentAudio) {
+              currentAudio.pause();
+              currentAudio.src = '';
+              currentAudio = null;
+            }
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudio = audio;
+        isTTSPlaying = true;
+        audio.oncanplaythrough = () => {
+          audio.play().catch(err => log('[TTS Playback] Erro: ' + err, 'error'));
+        };
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          if (currentAudio === audio) currentAudio = null;
+          isTTSPlaying = false;
+          resolve();
+        };
+      });
+    }
+
+    function clearLogs() {
+      if (currentLogElement) {
+        currentLogElement.remove();
+      }
+    }
+
+    window.addEventListener('load', () => {
+      log('[Pipeline] Iniciando pipeline de voz...', 'info');
+      startVoicePipeline();
+    });
+  </script>
+</body>
+</html>
